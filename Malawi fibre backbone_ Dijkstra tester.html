@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Malawi fibre backbone: Dijkstra tester</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f7f4;--surface:#fff;--ink:#1c2420;--muted:#5d6a63;--line:#c9d1cb;--edge:#8a978f;--accent:#0b6e4f;--path:#d9480f;--settled:#cfe8dc;--node:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#121815;--surface:#1b231f;--ink:#e8eee9;--muted:#9aa8a0;--line:#33403a;--edge:#6b7a72;--accent:#4cc79b;--path:#ff8a4c;--settled:#24493a;--node:#1b231f}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:20px;grid-template-columns:minmax(0,340px) minmax(0,1fr)}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+h1{font:600 1.45rem/1.25 Georgia,"Times New Roman",serif;margin:0 0 4px}
+p.sub{margin:0 0 16px;color:var(--muted);font-size:.92rem}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 3px}
+select,button{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+button{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600;cursor:pointer;margin-top:14px}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--path);outline-offset:2px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#result{margin-top:16px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:6px;min-height:70px}
+#result b{font-size:1.25rem}
+input[type=range]{width:100%;margin-top:6px}
+#log{font:.82rem/1.45 ui-monospace,Menlo,Consolas,monospace;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;max-height:260px;overflow:auto;white-space:pre-wrap;margin-top:12px}
+.board{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px;overflow-x:auto}
+svg{display:block;width:100%;height:auto;min-width:420px}
+.e{stroke:var(--edge);stroke-width:2}.e.p{stroke:var(--path);stroke-width:5}
+.w{font-size:15px;fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:5px}
+.n circle{fill:var(--node);stroke:var(--ink);stroke-width:2}.n.s circle{fill:var(--settled)}.n.p circle{stroke:var(--path);stroke-width:4}
+.n .l{font:700 17px system-ui,sans-serif;fill:var(--ink);text-anchor:middle}
+.n .t{font-size:14px;fill:var(--ink);text-anchor:middle;paint-order:stroke;stroke:var(--surface);stroke-width:4px}
+.n .d{font-size:14px;font-weight:700;fill:var(--accent);text-anchor:middle;paint-order:stroke;stroke:var(--surface);stroke-width:4px}
+</style>
+</head>
+<body>
+<main>
+<section>
+  <h1>Malawi national fibre backbone</h1>
+  <p class="sub">21 towns, 22 cable routes, distances in km. Pick two towns and run Dijkstra’s algorithm.</p>
+  <div class="row">
+    <div><label for="src">From</label><select id="src"></select></div>
+    <div><label for="dst">To</label><select id="dst"></select></div>
+  </div>
+  <button id="run">Find shortest route</button>
+  <div id="result" aria-live="polite">Choose a source and destination, then run.</div>
+  <label for="step">Step through the algorithm</label>
+  <input id="step" type="range" min="0" max="0" value="0">
+  <div id="log"></div>
+</section>
+<section class="board"><svg id="g" viewBox="0 0 1000 1420" role="img" aria-label="Weighted graph of the Malawi fibre backbone"></svg></section>
+</main>
+<script>
+const N=[["A","Lilongwe",470,760],["B","Blantyre",700,1280],["C","Mzuzu",520,320],["D","Zomba",850,1170],["E","Kasungu",330,560],["F","Mangochi",900,880],["G","Salima",800,740],["H","Karonga",640,60],["I","Dedza",500,900],["J","Nkhotakota",780,590],["K","Liwonde",880,1030],["L","Balaka",740,1090],["M","Mchinji",150,780],["N","Nsanje",420,1320],["O","Mulanje",860,1360],["P","Thyolo",560,1350],["Q","Chikwawa",540,1190],["R","Ntcheu",620,1010],["S","Dwangwa",720,440],["T","Rumphi",600,190],["U","Mzimba",360,400]];
+// Ntcheu-Dedza (I-R) is 50 km per the table; the hand drawing says 30. Change it here if needed.
+const E=[["B","D",60],["B","O",80],["B","Q",40],["D","K",50],["K","F",70],["F","G",90],["G","A",100],["A","M",110],["A","I",90],["I","R",50],["R","L",60],["L","K",40],["A","E",130],["E","U",140],["U","C",50],["C","T",60],["T","H",120],["G","J",100],["J","S",40],["S","C",150],["Q","N",80],["P","B",30]];
+const idx=Object.fromEntries(N.map((n,i)=>[n[0],i]));
+const adj=N.map(()=>[]);
+E.forEach(([a,b,w])=>{adj[idx[a]].push([idx[b],w]);adj[idx[b]].push([idx[a],w]);});
+const $=id=>document.getElementById(id),NS="http://www.w3.org/2000/svg";
+function mk(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e}
+// Dijkstra with a step log (simple O(V^2) selection, fine for 21 nodes)
+function dijkstra(s){
+  const n=N.length,dist=Array(n).fill(Infinity),prev=Array(n).fill(-1),done=Array(n).fill(false),steps=[];
+  dist[s]=0;
+  for(let k=0;k<n;k++){
+    let u=-1;for(let i=0;i<n;i++)if(!done[i]&&(u<0||dist[i]<dist[u]))u=i;
+    if(u<0||dist[u]===Infinity)break;
+    done[u]=true;const relax=[];
+    for(const [v,w] of adj[u])if(!done[v]&&dist[u]+w<dist[v]){dist[v]=dist[u]+w;prev[v]=u;relax.push(N[v][0]+"="+dist[v]);}
+    steps.push({u,d:dist[u],relax,dist:[...dist],done:[...done]});
+  }
+  return{dist,prev,steps};
+}
+// Draw
+const svg=$("g"),edgeEls={},nodeEls=[];
+E.forEach(([a,b,w])=>{const A=N[idx[a]],B=N[idx[b]];
+  edgeEls[a+b]=edgeEls[b+a]=mk("line",{class:"e",x1:A[2],y1:A[3],x2:B[2],y2:B[3]},svg);});
+E.forEach(([a,b,w])=>{const A=N[idx[a]],B=N[idx[b]];
+  const t=mk("text",{class:"w",x:(A[2]+B[2])/2,y:(A[3]+B[3])/2+5,"text-anchor":"middle"},svg);t.textContent=w;});
+N.forEach(n=>{const g=mk("g",{class:"n"},svg);mk("circle",{cx:n[2],cy:n[3],r:24},g);
+  mk("text",{class:"l",x:n[2],y:n[3]+6},g).textContent=n[0];
+  mk("text",{class:"t",x:n[2],y:n[3]+44},g).textContent=n[1];
+  const d=mk("text",{class:"d",x:n[2],y:n[3]-32},g);nodeEls.push({g,d});});
+// Controls
+[$("src"),$("dst")].forEach((s,k)=>{N.forEach((n,i)=>s.add(new Option(n[0]+" – "+n[1],i)));s.value=k?13:0;});
+let cur=null,path=[];
+function paint(k){
+  nodeEls.forEach(x=>{x.g.classList.remove("s","p");x.d.textContent="";});
+  Object.values(edgeEls).forEach(e=>e.classList.remove("p"));
+  if(!cur)return;
+  const st=k>0?cur.steps[k-1]:null;
+  if(st)st.dist.forEach((d,i)=>{if(d<Infinity)nodeEls[i].d.textContent=d;if(st.done[i])nodeEls[i].g.classList.add("s");});
+  if(k===cur.steps.length){path.forEach((v,i)=>{nodeEls[v].g.classList.add("p");if(i)edgeEls[N[path[i-1]][0]+N[v][0]].classList.add("p");});}
+  let t="";cur.steps.slice(0,k).forEach((s,i)=>{t+="Step "+(i+1)+": settle "+N[s.u][0]+" ("+N[s.u][1]+") at "+s.d+" km"+(s.relax.length?"\n    update "+s.relax.join(", "):"")+"\n";});
+  $("log").textContent=t||"Run the algorithm to see each step.";
+}
+function run(){
+  const s=+$("src").value,t=+$("dst").value;cur=dijkstra(s);path=[];
+  for(let x=t;x!==-1;x=cur.prev[x])path.unshift(x);
+  const r=$("result");
+  if(cur.dist[t]===Infinity)r.textContent="No route found.";
+  else r.innerHTML="<b>"+cur.dist[t]+" km</b><br>"+path.map(v=>N[v][0]+" "+N[v][1]).join(" → ");
+  $("step").max=cur.steps.length;$("step").value=cur.steps.length;paint(cur.steps.length);
+}
+$("run").onclick=run;$("step").oninput=e=>paint(+e.target.value);
+run();
+</script>
+</body>
+</html>
