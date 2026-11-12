@@ -4,6 +4,7 @@ Dijkstra on the Malawi national fibre backbone (DSA 2026).
 
 Group members: Bill Sicginga, Flyness Ng'ambi, and Sibongire Chipwaila
 https://sichingabill-jpg.github.io/malawi-fibre-dijkstra/
+sichingabill-jpg.github.io.
 Course: Data Structures and Algorithms
 g++ -std=c++17 -O2 -o dijkstra dijkstra.cpp
 
